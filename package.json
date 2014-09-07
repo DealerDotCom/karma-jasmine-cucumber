@@ -1,0 +1,26 @@
+{
+  "name": "karma-jasmine-cucumber",
+  "version": "0.1.0",
+  "description": "cucumer-like api for karma and jasmine",
+  "main": "src/karma.js",
+  "scripts": {
+    "test": "karma start --single-run=true"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/DealerDotCom/karma-jasmine-cucumber.git"
+  },
+  "keywords": [
+    "jasmine",
+    "cucumber",
+    "test",
+    "integration",
+    "bdd",
+    "karma"
+  ],
+  "author": "Jonathan Hoguet <jonathan.hoguet@dealer.com>",
+  "license": "Apache-v2",
+  "bugs": {
+    "url": "https://github.com/DealerDotCom/karma-jasmine-cucumber/issues"
+  }
+}
