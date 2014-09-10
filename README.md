@@ -24,7 +24,7 @@ In short, unit tests likely still make sense in Jasmine and would be hard to wri
 
 *What about cucumberjs?* I haven't spent a lot of effort trying to make cucumberjs work - but it has the extra layer of translating non js files into js which adds considerable complexity (it isn't **just** javascript). It was also very important to me that 1 step be able to abstract away other steps (see nested steps below).
 
-#Api
+#API
 I recommend splitting your files into specs and steps, here is an example specs.js file
 
 ```javascript
@@ -172,7 +172,25 @@ So now we know we need a step definition for 'I get "6"', or do we… it also at
           Did you mean?
             I should get "3" (8)
             
-It is using levenshteinDistance which is very rough, but often its just enough to remind you that you're off by one word or letter. 
+It is using levenshteinDistance which is very rough, but often its just enough to remind you that you're off by one word or letter.
+
+Gotchas
+==
+
+Be careful not to use 'this' inside the inject function, as it will be a different context than your scenario. In this example, we are caching the scenario context at the top level, then using it to grab an $injector.
+
+```
+.before(function(){
+    var scenarioContext = this;
+
+    module('i18n');
+    inject(function(_$injector_){
+         scenarioContext.$injector = _$injector_;
+    });
+        
+    ...
+})
+```
 
 # Roadmap
 * Split `karma-jasmine-cucumber` to `jasmine-cucumber` so that it can be used with jasmine alone, eg: in protractor. 
