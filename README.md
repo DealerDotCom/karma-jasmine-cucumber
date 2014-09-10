@@ -179,7 +179,7 @@ Gotchas
 
 Be careful not to use 'this' inside the inject function, as it will be a different context than your scenario. In this example, we are caching the scenario context at the top level, then using it to grab an $injector.
 
-```
+```javascript
 .before(function(){
     var scenarioContext = this;
 
@@ -191,7 +191,266 @@ Be careful not to use 'this' inside the inject function, as it will be a differe
     ...
 })
 ```
+# Example
+As said previously, jasmine-cucumber won't make sense for every test you have. Where it excels is when the **intent** is getting *lost* in the complexity of the tests themselves. How will a new user (or you in a few months) know what the intent is of the test that is failing, or where to inject your new scneario or regression? With cucumber, this is easy, the intent is human readable and separated from the implementation. The architecture to manage the complexity is a series of step definitions. There isn't a lot to ramp up to. 
 
+Take these 2 examples
+
+## Before
+```javascript
+describe('i18n interpolation specs', function(){
+    // NOTE: we are testing with $compile instead of $interpolate b/c $compile is upstream and gives us more confidence
+    //  that we can interpolate attributes and other scenarios abstracted away from $interpolate
+    var $compile,
+        scope,
+        getWatchCount,
+        $interpolate;
+
+    beforeEach(function(){
+        module('i18n');
+        inject(function(i18nMessageResolver, i18nMessages, _$compile_, $rootScope, _$interpolate_){
+            $compile = _$compile_;
+            scope = $rootScope.$new(true);
+            scope.name = 'Lance';
+            $interpolate = _$interpolate_;
+
+            angular.extend(i18nMessages, {
+                'greeting.label' : 'Hi',
+                'greeting.dynamicLabel' : 'Hi {0}, so glad to see you again!',
+                'greeting.moreDynamicLabel' : 'Hi {0}, you\'re {1} years old today!',
+                'greeting.multiDynamicLabel' : 'Hi {0}, you are {0}, right?',
+                'simple.choice' : '{0} {0,choice,0#cars|1#car|1<cars}',
+                'decimal.choice' : '{0,choice,0#none|.5#half|1#one|1.5#one and a half|1.5<lots}',
+                'negative.choice' : '{0,choice,-1#negative|0#zero|1#one|1<lots}',
+                'dynamic.choice' : '{0,choice,0#no leads|1#1 lead|2#{0} leads}'
+            });
+            getWatchCount = function(){
+                return $rootScope.$$watchers + scope.$$watchers;
+            };
+
+        });
+    });
+
+    // a series of scenarios
+    // left side should be wrapped in any element - (easier to test by calling element.html() so we need any element)
+    // right side should be the expected .html() of that element
+    var expectations = {
+        // nothing to interpolate
+        "<p>Hi</p>" : "Hi",
+
+          // a simple label
+        "<p>{{@i18n(greeting.label)}}</p>" : "Hi",
+
+        // two simple labels
+        "<p>{{@i18n(greeting.label)}} {{@i18n(greeting.label)}}</p>" : "Hi Hi"
+    };
+
+    var expectationsWithWatch = {
+        // interpolate without i18n
+        "<p>{{name}}</p>" : "Lance",
+
+        // a label that is partially dynamic
+        "<p>{{@i18n(greeting.dynamicLabel)('Lance')}}</p>" : "Hi Lance, so glad to see you again!",
+
+        // a label that is more dynamic
+        "<p>{{@i18n(greeting.moreDynamicLabel)('Lance', 3)}}</p>" : "Hi Lance, you're 3 years old today!",
+
+        // a label with multiple instances of a variable
+        "<p>{{@i18n(greeting.multiDynamicLabel)('Lance')}}</p>" : "Hi Lance, you are Lance, right?",
+
+        // a label with choice format (zero)
+        "<p>{{@i18n(simple.choice)(0)}}</p>" : "0 cars",
+
+        // a label with choice format (1)
+        "<p>{{@i18n(simple.choice)(1)}}</p>" : "1 car",
+
+        // a label with choice format (2)
+        "<p>{{@i18n(simple.choice)(2)}}</p>" : "2 cars",
+
+        // a label with choice format negative
+        "<p>{{@i18n(negative.choice)(1)}}</p>" : "one",
+        "<p>{{@i18n(negative.choice)(-1)}}</p>" : "negative",
+
+        // a label with choice format decimal (.5)
+        "<p>{{@i18n(decimal.choice)(.5)}}</p>" : "half",
+
+        // a label with choice format decimal (1.5)
+        "<p>{{@i18n(decimal.choice)(1.5)}}</p>" : "one and a half",
+
+        // a label with choice format decimal (>1.5)
+        "<p>{{@i18n(decimal.choice)(1.6)}}</p>" : "lots",
+
+        // dynamic.choice
+        "<p>{{@i18n(dynamic.choice)(0)}}</p>" : "no leads",
+        "<p>{{@i18n(dynamic.choice)(1)}}</p>" : "1 lead",
+        "<p>{{@i18n(dynamic.choice)(2)}}</p>" : "2 leads"
+    };
+
+    Object.keys(expectations)
+    .map(function(key){
+        return {
+            input : key,
+            expected : expectations[key],
+            expectedWatches : 0
+        };
+    })
+    .concat(Object.keys(expectationsWithWatch).map(function(key){
+        return {
+            input : key,
+            expected : expectationsWithWatch[key],
+            expectedWatches : 1
+        };
+    }))
+    .forEach(function(test){
+        it('should interpolate ' + test.input + ' to ' + test.expected, function(){
+
+            var el;
+            runs(function(){
+                el = $compile(test.input)(scope);
+                scope.$digest();
+            });
+            var nextThreadLoop = false;
+            setTimeout(function(){
+                nextThreadLoop = true;
+            })
+            waitsFor(function(){
+                return nextThreadLoop;
+            });
+
+            runs(function(){
+                expect(el.html()).toBe(test.expected);
+                expect((scope.$$watchers || []).length).toBe(test.expectedWatches);
+            });
+        });
+    });
+
+    it('should be able to do dynamic interpolation', function(){
+        var dynamic = 'greeting.label';
+        var output = $interpolate('{{@i18n(' + dynamic + ')}}')();
+        expect(output).toBe('Hi');
+    });
+});
+
+````
+## After
+
+```javascript
+/* globals feature:false, featureSteps:false, expect:false, runs:false, waitsFor:false */
+feature('i18n: shouldn\'t break interpolation')
+    .scenario('should still be able to interpolate nothing')
+        .when('I compile "<p>Hi</p>"')
+        .then('I should get html "Hi"')
+        .and('there should be "0" watches')
+    .scenario('should still be able to interpolate variable')
+        .given('I set scope "name" to "Lance"')
+        .when('I compile "<p>{{name}}</p>"')
+        .then('I should get html "Lance"')
+        .and('there should be "1" watch')
+
+feature('i18n: labels')
+    .scenario('should be able to translate a simple label')
+        .given('I set message "greeting.label" to "Hi"')
+        .when('I compile "<p>{{@i18n(greeting.label)}}</p>"')
+        .then('I should get html "Hi"')
+        .and('there should be "0" watch')
+
+    .scenario('should be able to translate multiple labels')
+        .given('I set message "greeting.label" to "Hi"')
+        .when('I compile "<p>{{@i18n(greeting.label)}} {{@i18n(greeting.label)}}</p>"')
+        .then('I should get html "Hi Hi"')
+        .and('there should be "0" watch')
+
+feature('i18n: labels with place holders')
+    .scenario('should be able to inject a value into a label')
+        .given('I set message "greeting.label" to "Hi {0}"')
+        .and('I set scope "name" to "Lance"')
+        .when('I compile "<p>{{@i18n(greeting.label)(name)}}</p>"')
+        .then('I should get html "Hi Lance"')
+        .and('there should be "1" watch')
+    .scenario('should be able to inject multiple values into a label')
+        .given('I set message "greeting.label" to "Hi {0}, you are {1} today"')
+        .and('I set scope "name" to "Lance"')
+        .and('I set scope "age" to "3"')
+        .when('I compile "<p>{{@i18n(greeting.label)(name, age)}}</p>"')
+        .then('I should get html "Hi Lance, you are 3 today"')
+        .and('there should be "1" watch')
+    .scenario('should be able to inject the same value more than once')
+        .given('I set message "greeting.label" to "Hi {0}, you are {0}, right?"')
+        .and('I set scope "name" to "Lance"')
+        .when('I compile "<p>{{@i18n(greeting.label)(name, age)}}</p>"')
+        .then('I should get html "Hi Lance, you are Lance, right?"')
+        .and('there should be "1" watch')
+
+feature('i18n: choice format')
+    .scenario('should be get the first choice when providing a value less than the first one')
+        .given('I set message "cars" to "{0,choice,0#none|1#a car|1<cars}"')
+        .when('I compile "<p>{{@i18n(cars)(-1)}}</p>"')
+        .then('I should get html "none"')
+        .and('there should be "1" watch')
+    .scenario('should be get the first choice when providing a equal to the first one')
+        .given('I set message "cars" to "{0,choice,0#none|1#a car|1<cars}"')
+        .when('I compile "<p>{{@i18n(cars)(0)}}</p>"')
+        .then('I should get html "none"')
+        .and('there should be "1" watch')
+    .scenario('should be get the first choice when providing a value greater than the first one but less than the second one')
+        .given('I set message "cars" to "{0,choice,0#none|1#a car|1<cars}"')
+        .when('I compile "<p>{{@i18n(cars)(0.5)}}</p>"')
+        .then('I should get html "none"')
+        .and('there should be "1" watch')
+    ...
+    
+    /* globals featureSteps:false, module:false, inject:false, expect:false, waitsFor:false, runs:false, spyOn:false */
+
+featureSteps("i18n:")
+    .before(function(){
+        var scenarioContext = this;
+
+        module('i18n');
+        inject(function(_$injector_){
+            scenarioContext.$injector = _$injector_;
+        });
+        var $rootScope = this.$injector.get('$rootScope');
+        this.scope = $rootScope.$new(true);
+        this.getWatchCount = function(){
+            return ($rootScope.$$watchers || []).length + (this.scope.$$watchers || []).length;
+        };
+        spyOn(this.$injector.get('$log'), 'error');
+
+    })
+    .given('I set scope "(.*)" to "(.*)"', function(prop, val){
+        this.scope[prop] = val;
+    })
+    .given('I set message "(.*)" to "(.*)"', function(code, val){
+        this.$injector.get('i18nMessages')[code] = val;
+    })
+    .when('I compile "(.*)"', function(fragment){
+        var scenarioContext = this;
+        this.scope.$apply(function(){
+            scenarioContext.element = scenarioContext.$injector.get('$compile')(fragment)(scenarioContext.scope);
+        });
+    })
+    .then('I should get html "(.*)"', function(html){
+        expect(this.element.html()).toBe(html);
+    })
+    .then('there should be "(.*)" watche?s?', function(watchCount){
+        var scenarioContext = this,
+            nextThreadLoop = false;
+        setTimeout(function(){
+            nextThreadLoop = true;
+        })
+        waitsFor(function(){
+            return nextThreadLoop;
+        });
+
+        runs(function(){
+            expect(scenarioContext.getWatchCount()).toBe(watchCount * 1);
+        });
+    })
+    .then('there should be "(.*)" errors? logged', function(errorCount){
+        expect(this.$injector.get('$log').error.callCount).toBe(errorCount * 1);
+    });
+
+```
 # Roadmap
 * Split `karma-jasmine-cucumber` to `jasmine-cucumber` so that it can be used with jasmine alone, eg: in protractor. 
 * add support for `when` after `then` for sequence oriented end to end tests where it doesn't always make sense to start the workflow over again for every assertion
