@@ -451,6 +451,9 @@ featureSteps("i18n:")
     });
 
 ```
+
+Which has a clearer intent? Which is easier to jump into as a new user? *NOTE:* that I started doing this in traditional jasmine and switched to cucumber when I felt like the intent was getting lost and/or the comlexity warranted it (in this case it was mostly about intent);
+
 # Roadmap
 * Split `karma-jasmine-cucumber` to `jasmine-cucumber` so that it can be used with jasmine alone, eg: in protractor. 
 * add support for `when` after `then` for sequence oriented end to end tests where it doesn't always make sense to start the workflow over again for every assertion
