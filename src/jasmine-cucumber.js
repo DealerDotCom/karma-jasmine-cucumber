@@ -56,6 +56,9 @@
         feature.beforeSteps = relevantFeatureSteps.reduce(function(reduce, item){
             return reduce.concat(item.beforeSteps);
         }, []);
+        feature.afterSteps = relevantFeatureSteps.reduce(function(reduce, item){
+            return reduce.concat(item.afterSteps);
+        }, []);
         var scenarios = feature.scenarios.filter(function(item){
             return item.isOnly;
         });
@@ -99,6 +102,13 @@
                         step.call(scenarioContext);
                     });
                 });
+
+                afterEach(function(){
+                    feature.afterSteps.forEach(function(step){
+                      step.call(scenarioContext);
+                    });
+                });
+                
                 var desc = scenario.isOnly ? ddescribe : describe;
                 desc('\nScenario: ' + scenario.description + '\n', getScenarioRunner(scenario));
             });
@@ -308,6 +318,7 @@
     function FeatureSteps(featurePattern, callback){
         this.pattern = new RegExp(featurePattern);
         this.beforeSteps = [];
+        this.afterSteps = [];
         this.steps = [];
         this.given = this.when = this.then = function(pattern, definition){
             this.steps.push({pattern : new RegExp('^' + pattern + '$'), definition : definition});
@@ -315,6 +326,11 @@
         };
         this.before = function(definition){
             this.beforeSteps.push(definition);
+            return this;
+        };
+
+        this.after = function(definition){
+            this.afterSteps.push(definition);
             return this;
         };
 

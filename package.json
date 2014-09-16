@@ -1,6 +1,6 @@
 {
   "name": "karma-jasmine-cucumber",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "cucumer-like api for karma and jasmine",
   "main": "src/karma.js",
   "scripts": {
