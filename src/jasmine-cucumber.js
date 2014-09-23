@@ -71,19 +71,62 @@
         }
         scenarios.forEach(function(scenario){
             var missingSteps = [],
-                ambiguousSteps = [],
-                scenarioContext;
+                ambiguousSteps = [];
 
             describe('\nFeature: ' + feature.description, function(){
-                beforeEach(function(){
-                    scenarioContext = {
+                var desc = scenario.isOnly ? ddescribe : describe;
+                desc('\nScenario: ' + scenario.description + '\n', getScenarioRunner(scenario));
+            });
+
+            function getScenarioRunner(scenario){
+                var steps = scenario.beforeSteps.map(function(definition){
+                  return {
+                    description : '',
+                    step  : function(scenarioContext){
+                      definition.call(scenarioContext);
+                    }
+                  };
+                })
+                .concat(
+                  scenario.steps.map(function(scenarioStep){
+                    return {
+                      // TODO: givens could come after thens - but they are currently bucketed in a way
+                      //  where givens are grouped together
+                      description : scenarioStep.fullDescription,
+                      step : function(scenarioContext){
+                        var step = getStep(scenarioStep);
+                        if (step && missingSteps.length === 0 && ambiguousSteps.length === 0){
+                            step(scenarioContext);
+                        }
+                      }
+                    };
+                  })
+                )
+                .concat(
+                  scenario.afterSteps.map(function(definition){
+                    return {
+                      description : '',
+                      step  : function(scenarioContext){
+                        definition.call(scenarioContext);
+                      }
+                    };
+                  })
+                );
+
+                var description = steps.reduce(function(memo, item){
+                  memo += item.description ? '\n' + item.description : '';
+                  return memo;
+                }, '');
+
+                var scenarioExecuter = function(){
+                  var scenarioContext = {
                         when : function(description){
                             var step = getStep({
                                 description : description,
                                 arguments : Array.prototype.slice(arguments, 1)
                             });
                             if (step !== noOp){
-                                step();
+                                step(scenarioContext);
                             }
                             else{
                                 // we are now in the executing phase... and so we need to throw rather than queue into missingSteps
@@ -98,77 +141,19 @@
                         }
                     };
 
-                    feature.beforeSteps.forEach(function(step){
-                        step.call(scenarioContext);
-                    });
-                });
+                  steps.forEach(function(step){
+                    step.step(scenarioContext);
+                  });
 
-                afterEach(function(){
-                    feature.afterSteps.forEach(function(step){
-                      step.call(scenarioContext);
-                    });
-                });
-                
-                var desc = scenario.isOnly ? ddescribe : describe;
-                desc('\nScenario: ' + scenario.description + '\n', getScenarioRunner(scenario));
-            });
+                  if (missingSteps.length > 0){
+                        this.fail('Missing step definitions:\n\t' +
+                            missingSteps.map(stepWithLikelyMatch)
+                            .join('\n\t'));
+                    }
+                };
 
-            function getScenarioRunner(scenario){
-                return recursiveDescribe(scenario.givens, 'Given', recursiveDescribe(scenario.whens, 'When', getThensRunner(scenario.thens)));
-            }
-
-            function recursiveDescribe(descriptions, prefix, callback){
-                if (descriptions.length > 0){
-                    var description = descriptions.pop();
-
-                    var smartPrefix = descriptions.length === 0 ? prefix : 'And';
-
-                    return recursiveDescribe(descriptions, prefix, function(){
-                        describe(smartPrefix + '  ' + description.description + '\n', function(){
-                            var step = getStep(description);
-                            beforeEach(function(){
-                                if (step && missingSteps.length === 0 && ambiguousSteps.length === 0){
-                                    step();
-                                }
-                            });
-
-                            callback();
-                        });
-                    });
-                } else{
-                    return callback;
-                }
-            }
-
-            function getThensRunner(thens){
-                var itWrappers = thens.map(function(then){
-                    var step = getStep(then);
-                    return function(){
-                        if (step && missingSteps.length === 0 && ambiguousSteps.length === 0){
-                            it('Then  ' + then.description + '\n', function(){
-                                step();
-                            });
-                        }
-                    };
-                });
                 return function(){
-                    itWrappers.forEach(function(item){
-                        item();
-                    });
-
-                    if (missingSteps.length > 0){
-                        it('\nMissing step definitions', function(){
-                            this.fail('Missing step definitions:\n\t' +
-                                missingSteps.map(stepWithLikelyMatch)
-                                .join('\n\t'));
-                        });
-                    }
-                    else if (thens.length === 0){
-                        it('\nMissing Then...', function(){
-                            this.fail('Missing then, add a then step');
-                        });
-                    }
-
+                  it(description, scenarioExecuter);
                 };
             }
 
@@ -185,10 +170,11 @@
                     return memo.concat(feature.scenarios);
                 }, [])
                     .reduce(function(memo, scenario){
-                        return memo.concat(scenario.givens.map(mapDescription))
-                            .concat(scenario.whens.map(mapDescription))
-                            .concat(scenario.thens.map(mapDescription));
+                        return memo.concat(scenario.steps.map(mapDescription));
                     }, [])
+                    .map(function(item){
+                      return item;
+                    })
                     .filter(onlyUnique)
                     .filter(function(description){
                         return missingSteps.indexOf(description) === -1;
@@ -235,7 +221,9 @@
                 }
 
                 if (matchingSteps.length === 1){
-                    return function(){
+                    return function(scenarioContext){
+                        // TODO: ideally we could be detecting failed jasmine matcher so that we can include this description 
+                        //  as the step that failed. But that is proving to be very difficult requiring custom matchers... 
                         try{
                             matchingSteps[0].definition.apply(scenarioContext, matchingSteps[0].arguments);
                         }
@@ -263,24 +251,47 @@
             var self = this;
             options = options || {};
             this.description = scenarioDescription;
-            this.givens = [];
-            window.given = this.given = function(){
-                self.givens.push({ description : arguments[0], arguments : Array.prototype.splice.call(arguments, 1) });
-                self.and = self.given;
+            this.steps = [];
+            this.addStep = function(){
+              this.steps.push({
+                description : arguments[1],
+                fullDescription : arguments[0] + '  ' + arguments[1],
+                arguments : Array.prototype.splice.call(arguments, 2)
+              });
+            };
+
+            this.given = function(){
+                this.addStep.apply(this, ['Given'].concat(Array.prototype.slice.call(arguments, 0)));
+
+                self.and = function(){
+                  this.addStep.apply(this, ['And'].concat(Array.prototype.slice.call(arguments, 0)));
+                  return self;
+                };
+
                 return self;
             };
-            this.whens = [];
             this.when = function(){
-                this.whens.push({ description : arguments[0], arguments : Array.prototype.splice.call(arguments, 1) });
-                this.and = this.when;
-                return this;
+                self.addStep.apply(this, ['When'].concat(Array.prototype.slice.call(arguments, 0)));
+
+                self.and = function(){
+                  self.addStep.apply(this, ['And'].concat(Array.prototype.slice.call(arguments, 0)));
+                  return self;
+                };
+
+                return self;
             };
-            this.thens = [];
             this.then = function(){
-                this.thens.push({ description : arguments[0], arguments : Array.prototype.splice.call(arguments, 1) });
-                this.and = this.then;
-                return this;
+                self.addStep.apply(this, ['Then'].concat(Array.prototype.slice.call(arguments, 0)));
+
+                self.and = function(){
+                  self.addStep.apply(this, ['And'].concat(Array.prototype.slice.call(arguments, 0)));
+                  return self;
+                };
+                
+                return self;
             };
+
+            // could add this.and as a default - but at least this way you don't get and until you use given, when or then
             this.isOnly = options.only === true ? true : false;
             this.never = options.not === true ? true : false;
         }
