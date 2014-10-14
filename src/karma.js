@@ -39,5 +39,5 @@ function init (files) {
 init.$inject = ['config.files'];
 
 module.exports = {
-    'framework:jasmine-cucumber' : ['factory', init]
+    'framework:karma-jasmine-cucumber' : ['factory', init]
 };
