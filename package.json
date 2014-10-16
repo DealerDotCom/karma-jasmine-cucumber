@@ -1,6 +1,6 @@
 {
   "name": "karma-jasmine-cucumber",
-  "version": "0.3.4",
+  "version": "1.0.0",
   "description": "cucumer-like api for karma and jasmine",
   "main": "src/karma.js",
   "scripts": {
@@ -24,6 +24,6 @@
     "url": "https://github.com/DealerDotCom/karma-jasmine-cucumber/issues"
   },
   "dependencies": {
-    "jasmine-cucumber": "~0.1.0"
+    "jasmine-cucumber": "~1.0.0"
   }
 }
