@@ -14,6 +14,9 @@ Notice that `karma-jasmine-cucumber` depends on `jasmine` to come before it.
 Check out [jasmine-cucumber](https://github.com/DealerDotCom/jasmine-cucumber) for more details about the actual api. 
 
 # Release Notes
+##v 1.0.1
+* loosened the version of jasmine-cucumber so that we don't have to release this module to get non-breaking changes
+
 ##v 1.0.0
 * updated to depend on jasmine-cucumber 1.0 which gives us jasmine 2.0 support. This was a breaking change due to breaking nature of jasmine 2.0 syntax. Main win was better async support which is now exposed in grunt style syntax
 
