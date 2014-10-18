@@ -7,10 +7,9 @@ module.exports = function(config) {
     // base path that will be used to resolve all patterns (eg. files, exclude)
     basePath: '',
 
-
     // frameworks to use
     // available frameworks: https://npmjs.org/browse/keyword/karma-adapter
-    frameworks: ['jasmine', 'jasmine-cucumber'],
+    frameworks: ['jasmine', 'karma-jasmine-cucumber'],
 
 
     // list of files / patterns to load in the browser
