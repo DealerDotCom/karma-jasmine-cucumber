@@ -13,6 +13,12 @@ Notice that `karma-jasmine-cucumber` depends on `jasmine` to come before it.
 
 Check out [jasmine-cucumber](https://github.com/DealerDotCom/jasmine-cucumber) for more details about the actual api. 
 
+# Deprecated at Dealer.com
+Given minimal adoption of this package at Dealer.com we have decided to deprecate it. We are embracing cucumberjs and finding it to be good enough. 
+
+[Gregory Limoratto](https://github.com/gregorylimoratto) has been a primary contributor and will continue development on his [fork](https://github.com/gregorylimoratto/karma-jasmine-cucumber). 
+
+
 # Release Notes
 ##v 1.0.1
 * loosened the version of jasmine-cucumber so that we don't have to release this module to get non-breaking changes
